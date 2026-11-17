@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Filtro Vasarely · Op art en vivo</title>
+<meta name="description" content="Convierte tu cámara o una foto en una ilusión óptica al estilo de Victor Vasarely.">
+<meta name="theme-color" content="#ecd9a8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600&family=Playfair+Display:ital,wght@0,700;1,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --parch:#f3e6c4; --parch2:#e6d19c; --wine:#6b1111; --wine2:#8a1c1c;
+  --ink:#2b1608; --gold:#b08a3e; --cream:#fbf4e0;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; color:var(--ink);
+  font-family:"Lora",Georgia,"Times New Roman",serif;
+  background:
+    radial-gradient(ellipse at 50% 0%, #f8eed2 0%, #efdcae 55%, #dcc388 100%) fixed;
+  min-height:100vh;
+}
+body::before{ /* grano de papel */
+  content:""; position:fixed; inset:0; pointer-events:none; opacity:.22; mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .45  0 0 0 0 .32  0 0 0 0 .15  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+header{text-align:center; padding:22px 16px 6px; position:relative}
+h1{
+  margin:0; font-family:"Playfair Display",Georgia,serif; font-style:italic; font-weight:700;
+  color:var(--wine); font-size:clamp(34px,7vw,56px); line-height:1.05; letter-spacing:.2px;
+}
+.sub{margin:6px 0 0; font-style:italic; color:#5a2a14; font-size:clamp(15px,2.6vw,19px)}
+.orn{display:flex; align-items:center; gap:10px; max-width:420px; margin:12px auto 0; color:var(--wine)}
+.orn::before,.orn::after{content:""; flex:1; height:1px; background:linear-gradient(90deg,transparent,var(--wine) 40%,var(--wine) 60%,transparent)}
+.orn i{width:9px; height:9px; background:var(--wine); transform:rotate(45deg); display:block}
+
+main{
+  max-width:1060px; margin:0 auto; padding:14px 14px 40px;
+  display:grid; gap:22px; grid-template-columns:1fr; align-items:start;
+}
+@media (min-width:860px){ main{grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr)} }
+
+.stage{display:flex; flex-direction:column; align-items:center; gap:14px}
+.frame{
+  background:var(--cream); padding:10px; border-radius:3px; max-width:100%;
+  box-shadow:0 0 0 2px var(--wine), 0 0 0 6px var(--parch), 0 0 0 7px var(--gold), 0 14px 34px rgba(70,25,0,.38);
+}
+canvas#out{display:block; width:auto; height:auto; max-width:100%; max-height:70vh; background:#111}
+.hint{margin:0; min-height:1.3em; text-align:center; font-style:italic; font-size:14px; color:#5a2a14}
+.hint.err{color:#9a1010; font-style:normal; font-weight:600}
+
+.actions{display:flex; flex-wrap:wrap; gap:10px; justify-content:center}
+button,.btn{
+  font:inherit; font-size:15px; cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent;
+  border:1px solid var(--wine); color:var(--wine); background:var(--cream);
+  padding:.62em 1.05em; border-radius:4px; display:inline-flex; align-items:center; gap:.5em;
+  box-shadow:inset 0 0 0 2px var(--cream), inset 0 0 0 3px rgba(107,17,17,.35);
+  transition:background .12s, color .12s, transform .05s;
+}
+button:hover,.btn:hover{background:#f7e9c4}
+button:active,.btn:active{transform:translateY(1px)}
+button.primary{background:var(--wine); color:#f9edd0; box-shadow:inset 0 0 0 2px var(--wine), inset 0 0 0 3px rgba(249,237,208,.45)}
+button.primary:hover{background:var(--wine2)}
+button[hidden]{display:none}
+input[type=file]{display:none}
+
+.panel{
+  background:rgba(251,244,224,.7); border:1px solid var(--gold); border-radius:4px; padding:16px 16px 12px;
+  box-shadow:inset 0 0 0 4px rgba(251,244,224,.8), inset 0 0 0 5px rgba(176,138,62,.5);
+}
+h2{
+  margin:14px 0 8px; font-family:"Playfair Display",Georgia,serif; font-style:italic; font-weight:600;
+  font-size:20px; color:var(--wine); display:flex; align-items:center; gap:10px;
+}
+h2:first-child{margin-top:2px}
+h2::after{content:""; flex:1; height:1px; background:linear-gradient(90deg,var(--gold),transparent)}
+.chips{display:flex; flex-wrap:wrap; gap:8px}
+.chip{padding:.5em .9em}
+.chip[aria-pressed=true]{background:var(--wine); color:#f9edd0; box-shadow:inset 0 0 0 2px var(--wine), inset 0 0 0 3px rgba(249,237,208,.45)}
+.desc{margin:8px 0 0; font-size:14px; font-style:italic; color:#5a2a14; min-height:1.3em}
+.sw{display:inline-block; width:52px; height:12px; border-radius:2px; border:1px solid rgba(0,0,0,.35)}
+.chip[aria-pressed=true] .sw{border-color:rgba(255,255,255,.6)}
+
+.row{display:grid; grid-template-columns:132px 1fr 36px; align-items:center; gap:10px; margin:9px 0}
+.row label{font-size:15px}
+.row output{font-size:13px; color:#5a2a14; text-align:right}
+input[type=range]{width:100%; accent-color:var(--wine); height:28px; margin:0}
+.checks{display:flex; flex-wrap:wrap; gap:6px 22px; margin-top:12px}
+.checks label{display:flex; align-items:center; gap:8px; font-size:15px; cursor:pointer}
+.checks input{accent-color:var(--wine); width:18px; height:18px}
+
+footer{max-width:680px; margin:0 auto; padding:0 18px 34px; text-align:center; font-size:13px; color:#6a3a22; font-style:italic}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
+video{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Filtro Vasarely</h1>
+  <p class="sub">Mira el mundo como una ilusión óptica</p>
+  <div class="orn" aria-hidden="true"><i></i></div>
+</header>
+
+<main>
+  <section class="stage" aria-label="Vista previa">
+    <div class="frame"><canvas id="out" width="540" height="720" aria-label="Imagen con filtro op art"></canvas></div>
+    <p id="hint" class="hint" role="status"></p>
+    <div class="actions">
+      <button id="btnCam" class="primary" type="button">Activar cámara</button>
+      <label class="btn" for="file">Subir foto</label>
+      <input id="file" type="file" accept="image/*">
+      <button id="btnFlip" type="button" hidden>Voltear cámara</button>
+      <button id="btnFreeze" type="button" hidden>Congelar foto</button>
+      <button id="btnSave" type="button">Descargar PNG</button>
+      <button id="btnShare" type="button" hidden>Compartir</button>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="Ajustes">
+    <h2>Filtro</h2>
+    <div class="chips" id="filters"></div>
+    <p class="desc" id="fdesc"></p>
+
+    <h2>Paleta</h2>
+    <div class="chips" id="palettes"></div>
+
+    <h2>Ajustes</h2>
+    <div class="row"><label for="sInten">Intensidad</label><input id="sInten" type="range" min="0" max="100" value="60"><output id="oInten">60</output></div>
+    <div class="row"><label for="sSize">Tamaño de trama</label><input id="sSize" type="range" min="0" max="100" value="45"><output id="oSize">45</output></div>
+    <div class="row"><label for="sCont">Contraste</label><input id="sCont" type="range" min="0" max="100" value="50"><output id="oCont">50</output></div>
+    <div class="checks">
+      <label><input id="cInv" type="checkbox"> Invertir luces</label>
+      <label><input id="cMir" type="checkbox" checked> Espejo (cámara frontal)</label>
+    </div>
+
+    <h2>Formato</h2>
+    <div class="chips" id="formats"></div>
+  </section>
+</main>
+
+<footer>Inspirado en el lenguaje óptico de Victor Vasarely (Pécs, 1906 – París, 1997). Todo ocurre en tu dispositivo: las fotos no se suben a ningún servidor.</footer>
+
+<video id="vid" playsinline muted autoplay></video>
+
+<script>
+(()=>{
+'use strict';
+
+/* ───────── utilidades ───────── */
+const clamp=(x,a=0,b=1)=>x<a?a:x>b?b:x;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const hex=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
+const css=c=>'rgb('+(c[0]|0)+','+(c[1]|0)+','+(c[2]|0)+')';
+const mix=(a,b,t)=>[lerp(a[0],b[0],t),lerp(a[1],b[1],t),lerp(a[2],b[2],t)];
+const ri=(l,n)=>Math.min(n-1,Math.floor(clamp(l)*n));
+function lerpRamp(arr,t){const p=clamp(t)*(arr.length-1),i=Math.floor(p);return mix(arr[i],arr[Math.min(arr.length-1,i+1)],p-i);}
+const $=s=>document.querySelector(s);
+
+/* ───────── paletas ───────── */
+const PALETTES={
+  clasico:{name:'Vasarely clásico',ink:hex('#110e14'),paper:hex('#f4ebd3'),
+    ramp:['#1b2a8f','#1769d1','#13a4c9','#22b573','#a6d13a','#f7e21f','#f6a21c','#ee5a1f','#d9232f','#b3187a','#6b2aa8'].map(hex),
+    lines:['#1b2a8f','#1769d1','#13a4c9','#22b573','#d6a514','#ee5a1f','#d9232f','#b3187a','#6b2aa8'].map(hex)},
+  tricolor:{name:'Tricolor húngaro',ink:hex('#14301f'),paper:hex('#fbf4e4'),
+    ramp:['#14301f','#1f5a37','#2e8b57','#8cc09a','#fbf4e4','#f0b3a8','#e2574c','#c8102e','#8f0a22'].map(hex),
+    lines:['#14301f','#2e8b57','#c8102e','#8f0a22'].map(hex)}
+};
+
+/* ───────── estado ───────── */
+const state={filter:'cebras',palette:'clasico',inten:60,size:45,contrast:50,invert:false,mirror:true,
+             format:'34',mode:'demo',facing:'user'};
+const out=$('#out'), octx=out.getContext('2d');
+const video=$('#vid');
+let stream=null, still=null, demo=null;
+let needGrid=true, needDraw=true, lastLive=0;
+
+/* ───────── rejilla de luminosidad ───────── */
+const G={w:240,h:320,fine:null,smooth:null};
+const gc=document.createElement('canvas');
+const gctx=gc.getContext('2d',{willReadFrequently:true});
+
+function boxBlur(src,w,h,r){
+  const tmp=new Float32Array(w*h), o=new Float32Array(w*h), k=2*r+1;
+  for(let y=0;y<h;y++){
+    let acc=0; for(let i=-r;i<=r;i++) acc+=src[y*w+clamp(i,0,w-1)];
+    for(let x=0;x<w;x++){ tmp[y*w+x]=acc/k; acc+=src[y*w+Math.min(w-1,x+r+1)]-src[y*w+Math.max(0,x-r)]; }
+  }
+  for(let x=0;x<w;x++){
+    let acc=0; for(let i=-r;i<=r;i++) acc+=tmp[clamp(i,0,h-1)*w+x];
+    for(let y=0;y<h;y++){ o[y*w+x]=acc/k; acc+=tmp[Math.min(h-1,y+r+1)*w+x]-tmp[Math.max(0,y-r)*w+x]; }
+  }
+  return o;
+}
+function cropRect(sw,sh,a){let cw=sw,ch=sw/a;if(ch>sh){ch=sh;cw=sh*a;}return[(sw-cw)/2,(sh-ch)/2,cw,ch];}
+
+function buildGrid(src,sw,sh,mirror){
+  const sq=state.format==='sq', a=sq?1:3/4;
+  G.w=sq?256:240; G.h=sq?256:320;
+  if(gc.width!==G.w||gc.height!==G.h){gc.width=G.w;gc.height=G.h;}
+  const [cx,cy,cw,ch]=cropRect(sw,sh,a);
+  gctx.save();
+  if(mirror){gctx.translate(G.w,0);gctx.scale(-1,1);}
+  gctx.drawImage(src,cx,cy,cw,ch,0,0,G.w,G.h);
+  gctx.restore();
+  const d=gctx.getImageData(0,0,G.w,G.h).data, n=G.w*G.h;
+  const L=new Float32Array(n), hist=new Uint32Array(256);
+  for(let i=0;i<n;i++){const v=0.299*d[4*i]+0.587*d[4*i+1]+0.114*d[4*i+2];L[i]=v/255;hist[v|0]++;}
+  let lo=0,hi=255,acc=0;
+  for(lo=0;lo<255;lo++){acc+=hist[lo];if(acc>n*0.02)break;}
+  acc=0; for(hi=255;hi>0;hi--){acc+=hist[hi];if(acc>n*0.02)break;}
+  const span=Math.max(40,hi-lo)/255, lo01=lo/255, c=0.4+state.contrast/100*1.8;
+  for(let i=0;i<n;i++){
+    let v=clamp((L[i]-lo01)/span);
+    v=clamp((v-0.5)*c+0.5);
+    L[i]=state.invert?1-v:v;
+  }
+  G.fine=boxBlur(L,G.w,G.h,1);
+  G.smooth=boxBlur(boxBlur(L,G.w,G.h,5),G.w,G.h,5);
+  G.soft=boxBlur(boxBlur(boxBlur(L,G.w,G.h,12),G.w,G.h,12),G.w,G.h,12);
+}
+function S(arr,u,v){
+  const x=clamp(u)*(G.w-1), y=clamp(v)*(G.h-1);
+  const x0=x|0,y0=y|0,x1=Math.min(G.w-1,x0+1),y1=Math.min(G.h-1,y0+1),fx=x-x0,fy=y-y0;
+  const i=y0*G.w,j=y1*G.w;
+  return (arr[i+x0]*(1-fx)+arr[i+x1]*fx)*(1-fy)+(arr[j+x0]*(1-fx)+arr[j+x1]*fx)*fy;
+}
+function poly(ctx,pts){ctx.beginPath();ctx.moveTo(pts[0],pts[1]);for(let i=2;i<pts.length;i+=2)ctx.lineTo(pts[i],pts[i+1]);ctx.closePath();ctx.fill();}
+
+/* ───────── filtros ───────── */
+
+// 1 · Cebras: rayas que se curvan con la luz
+function rCebras(ctx,W,H,P){
+  const ink=P.pal.ink, paper=P.pal.paper;
+  const img=ctx.createImageData(W,H), d=img.data;
+  const period=W*lerp(0.014,0.06,P.size);
+  const ang=0.55, ca=Math.cos(ang), sa=Math.sin(ang);
+  const warp=P.inten*5.5, bias=0.25+0.7*P.inten, aa=1.2/period;
+  let k=0;
+  for(let y=0;y<H;y++){
+    const v=y/H;
+    for(let x=0;x<W;x++,k+=4){
+      const u=x/W, ls=S(G.smooth,u,v), lf=S(G.fine,u,v);
+      const ph=(x*ca+y*sa)/period+warp*(ls-0.5);
+      const f=ph-Math.floor(ph), tri=Math.abs(f-0.5)*2;
+      const w=clamp(0.5+(0.5-lf)*bias,0.06,0.94);
+      const cov=clamp((tri-(1-w))/(2*aa)+0.5);
+      d[k]=paper[0]+(ink[0]-paper[0])*cov;
+      d[k+1]=paper[1]+(ink[1]-paper[1])*cov;
+      d[k+2]=paper[2]+(ink[2]-paper[2])*cov;
+      d[k+3]=255;
+    }
+  }
+  ctx.putImageData(img,0,0);
+}
+
+// 2 · Esfera: retícula que se hincha (tipo Vega)
+function rEsfera(ctx,W,H,P){
+  const {ink,ramp}=P.pal, n=ramp.length;
+  ctx.fillStyle=css(ink); ctx.fillRect(0,0,W,H);
+  const cols=Math.round(lerp(34,9,P.size)), cs=W/cols;
+  const nC=cols+10, nR=Math.ceil(H/cs)+10;
+  const cx=W/2, cy=H/2, R0=Math.min(W,H)*0.5;
+  const vx=new Float32Array((nC+1)*(nR+1)), vy=new Float32Array((nC+1)*(nR+1));
+  for(let j=0;j<=nR;j++)for(let i=0;i<=nC;i++){
+    const dx=(i-nC/2)*cs, dy=(j-nR/2)*cs, rr=Math.hypot(dx,dy)/R0;
+    const rad=Math.exp(-rr*rr*1.3), ls=S(G.soft,(cx+dx)/W,(cy+dy)/H);
+    const B=clamp(P.inten*(1.5*rad+0.45*(ls-0.4)),-0.2,2.2), id=j*(nC+1)+i;
+    vx[id]=cx+dx*(1+B); vy[id]=cy+dy*(1+B);
+  }
+  const shrink=0.9;
+  for(let j=0;j<nR;j++)for(let i=0;i<nC;i++){
+    const a=j*(nC+1)+i, b=a+1, c=a+nC+1, e=c+1;
+    const mx=(vx[a]+vx[b]+vx[c]+vx[e])/4, my=(vy[a]+vy[b]+vy[c]+vy[e])/4;
+    if(mx<-cs*4||mx>W+cs*4||my<-cs*4||my>H+cs*4)continue;
+    const dxc=((i+0.5)-nC/2)*cs, dyc=((j+0.5)-nR/2)*cs, rr=Math.hypot(dxc,dyc)/R0;
+    const lfc=S(G.fine,(cx+dxc)/W,(cy+dyc)/H);
+    const t=0.6*Math.exp(-rr*rr*1.3)+0.5*lfc;
+    ctx.fillStyle=css(ramp[ri(t,n)]);
+    poly(ctx,[mx+(vx[a]-mx)*shrink,my+(vy[a]-my)*shrink, mx+(vx[b]-mx)*shrink,my+(vy[b]-my)*shrink,
+              mx+(vx[e]-mx)*shrink,my+(vy[e]-my)*shrink, mx+(vx[c]-mx)*shrink,my+(vy[c]-my)*shrink]);
+  }
+}
+
+// 3 · Mosaico: rombos anidados que vibran
+function rMosaico(ctx,W,H,P){
+  const {ink,ramp}=P.pal, n=ramp.length;
+  ctx.fillStyle=css(ink); ctx.fillRect(0,0,W,H);
+  const across=Math.round(lerp(18,5,P.size)), h=W/(2*across), rows=Math.ceil(H/h)+2;
+  const dia=(cx,cy,s)=>poly(ctx,[cx,cy-s,cx+s,cy,cx,cy+s,cx-s,cy]);
+  for(let r=-1;r<rows;r++){
+    const cy=r*h, off=(r&1)?h:0;
+    for(let c=-1;c<=across;c++){
+      const cx=c*2*h+h+off, l=S(G.fine,cx/W,cy/H), idx=ri(l,n);
+      const s0=h*0.95, s1=s0*(0.78-0.5*P.inten*l), s2=s1*0.5;
+      ctx.fillStyle=css(ramp[idx]); dia(cx,cy,s0);
+      ctx.fillStyle=css(ramp[(idx+Math.ceil(n/2))%n]); dia(cx,cy,s1);
+      ctx.fillStyle=css(ramp[(idx+2)%n]); dia(cx,cy,s2);
+    }
+  }
+}
+
+// 4 · Líneas onduladas (serie Vonal)
+function rLineas(ctx,W,H,P){
+  const pal=P.pal;
+  ctx.fillStyle=css(pal.paper); ctx.fillRect(0,0,W,H);
+  const rows=Math.round(lerp(64,16,P.size)), sp=H/rows;
+  const amp=P.inten*sp*2.6, step=Math.max(2,W/180);
+  for(let j=-1;j<=rows;j++){
+    const y0=(j+0.5)*sp, top=[], bot=[];
+    ctx.fillStyle=css(lerpRamp(pal.lines,(j+0.5)/rows));
+    for(let x=-step;x<=W+step;x+=step){
+      const l=S(G.fine,x/W,y0/H), yc=y0+(0.5-l)*amp, t=sp*(0.1+0.85*Math.pow(1-l,1.2));
+      top.push(x,yc-t/2); bot.push(x,yc+t/2);
+    }
+    ctx.beginPath(); ctx.moveTo(top[0],top[1]);
+    for(let i=2;i<top.length;i+=2)ctx.lineTo(top[i],top[i+1]);
+    for(let i=bot.length-2;i>=0;i-=2)ctx.lineTo(bot[i],bot[i+1]);
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+// 5 · Unidades plásticas: cuadro + círculo / rombo
+function rUnidades(ctx,W,H,P){
+  const {ramp}=P.pal, n=ramp.length;
+  const cell=W/Math.round(lerp(30,8,P.size)), cols=Math.ceil(W/cell), rows=Math.ceil(H/cell);
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const x=c*cell, y=r*cell, cx=x+cell/2, cy=y+cell/2;
+    const l=S(G.fine,cx/W,cy/H), idx=ri(l,n);
+    ctx.fillStyle=css(ramp[idx]); ctx.fillRect(x,y,cell+0.6,cell+0.6);
+    const s=(1-P.inten)*0.55+P.inten*(0.15+0.85*l), rad=cell*0.5*s;
+    ctx.fillStyle=css(ramp[(idx+Math.ceil(n/2))%n]);
+    if(idx%2===0){ctx.beginPath();ctx.arc(cx,cy,rad,0,6.2832);ctx.fill();}
+    else{const q=rad*1.15;poly(ctx,[cx,cy-q,cx+q,cy,cx,cy+q,cx-q,cy]);}
+  }
+}
+
+// 6 · Cubos que entran y salen del plano (serie Tridim)
+function rCubos(ctx,W,H,P){
+  const pal=P.pal, ramp=pal.ramp, n=ramp.length;
+  ctx.fillStyle=css(pal.ink); ctx.fillRect(0,0,W,H);
+  const cols=lerp(22,6,P.size), w=W/cols, R=w/Math.sqrt(3), g=0.97;
+  const rows=Math.ceil(H/(1.5*R))+3, s=0.3+0.55*P.inten;
+  const white=[255,255,255], black=[0,0,0];
+  const A=[-90,-30,30,90,150,210].map(a=>a*Math.PI/180);
+  for(let r=-1;r<rows;r++){
+    const cy=r*1.5*R, off=(r&1)?w/2:0;
+    for(let c=-1;c<=Math.ceil(cols)+1;c++){
+      const cx=c*w+off, l=S(G.fine,cx/W,cy/H), base=ramp[ri(l,n)], up=l>0.5;
+      const v=A.map(a=>[cx+R*g*Math.cos(a),cy+R*g*Math.sin(a)]);
+      const cTop=up?mix(base,white,s*0.8):mix(base,black,s);
+      const cLeft=up?mix(base,black,s):mix(base,white,s*0.8);
+      ctx.fillStyle=css(cTop);  poly(ctx,[cx,cy,v[5][0],v[5][1],v[0][0],v[0][1],v[1][0],v[1][1]]);
+      ctx.fillStyle=css(base);  poly(ctx,[cx,cy,v[1][0],v[1][1],v[2][0],v[2][1],v[3][0],v[3][1]]);
+      ctx.fillStyle=css(cLeft); poly(ctx,[cx,cy,v[3][0],v[3][1],v[4][0],v[4][1],v[5][0],v[5][1]]);
+    }
+  }
+}
+
+const FILTERS={
+  cebras:  {label:'Cebras',   fn:rCebras,   desc:'Rayas que se curvan con la luz y la sombra.'},
+  esfera:  {label:'Esfera',   fn:rEsfera,   desc:'Una retícula de color que se hincha como una esfera.'},
+  mosaico: {label:'Mosaico',  fn:rMosaico,  desc:'Rombos anidados que parecen vibrar.'},
+  lineas:  {label:'Líneas',   fn:rLineas,   desc:'Líneas que ondulan y dibujan la imagen con su grosor.'},
+  unidades:{label:'Unidades', fn:rUnidades, desc:'Cuadros con círculos y rombos: su «alfabeto plástico».'},
+  cubos:   {label:'Cubos',    fn:rCubos,    desc:'Cubos que entran y salen del plano.'}
+};
+
+/* ───────── render ───────── */
+function renderTo(ctx,W,H){
+  const P={inten:state.inten/100,size:state.size/100,pal:PALETTES[state.palette]};
+  ctx.save(); ctx.clearRect(0,0,W,H);
+  FILTERS[state.filter].fn(ctx,W,H,P);
+  ctx.restore();
+}
+function getSource(){
+  if(state.mode==='live') return [video,video.videoWidth,video.videoHeight,state.mirror&&state.facing==='user'];
+  if(state.mode==='still') return [still,still.width,still.height,false];
+  return [demo,demo.width,demo.height,false];
+}
+function frame(t){
+  requestAnimationFrame(frame);
+  if(state.mode==='live'){
+    if(video.readyState<2||!video.videoWidth||t-lastLive<33) return;
+    lastLive=t; needGrid=true; needDraw=true;
+  }
+  if(!needDraw) return;
+  if(needGrid){const [s,w,h,m]=getSource(); buildGrid(s,w,h,m); needGrid=false;}
+  needDraw=false;
+  renderTo(octx,out.width,out.height);
+}
+
+/* ───────── imagen de ejemplo ───────── */
+function makeDemo(){
+  const c=document.createElement('canvas'); c.width=800; c.height=1000;
+  const x=c.getContext('2d');
+  let g=x.createLinearGradient(0,0,0,1000); g.addColorStop(0,'#1d1d2b'); g.addColorStop(.62,'#8e8a92'); g.addColorStop(1,'#d9d3c6');
+  x.fillStyle=g; x.fillRect(0,0,800,1000);
+  const sph=(cx,cy,r,lx,ly)=>{
+    x.fillStyle='rgba(0,0,0,.35)'; x.beginPath(); x.ellipse(cx+r*.35,cy+r*1.02,r*1.05,r*.22,0,0,7); x.fill();
+    const q=x.createRadialGradient(cx+lx*r,cy+ly*r,r*.04,cx,cy,r);
+    q.addColorStop(0,'#fff'); q.addColorStop(.35,'#b9b9c2'); q.addColorStop(1,'#16161f');
+    x.fillStyle=q; x.beginPath(); x.arc(cx,cy,r,0,7); x.fill();
+  };
+  sph(330,470,290,-.4,-.45); sph(640,800,150,-.35,-.4); sph(120,820,95,-.3,-.4);
+  return c;
+}
+demo=makeDemo();
+
+/* ───────── cámara y fotos ───────── */
+const hint=$('#hint');
+function say(t,err){hint.textContent=t;hint.classList.toggle('err',!!err);}
+function ui(){
+  const live=!!stream;
+  $('#btnCam').textContent=live?'Apagar cámara':'Activar cámara';
+  $('#btnFlip').hidden=!live;
+  $('#btnFreeze').hidden=!live;
+  $('#btnFreeze').textContent=state.mode==='live'?'Congelar foto':'Volver en vivo';
+  if(state.mode==='demo') say('Imagen de ejemplo · activa la cámara o sube una foto');
+  else if(state.mode==='live') say('En vivo · mueve los ajustes y verás el cambio al instante');
+  else say('Foto fija · puedes cambiar filtro y ajustes antes de descargar');
+}
+async function startCam(){
+  stopCam();
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    say('Este navegador no permite usar la cámara aquí. Sube una foto.',true); return;
+  }
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:state.facing},width:{ideal:1280},height:{ideal:960}}});
+    video.srcObject=stream; await video.play();
+    state.mode='live'; needGrid=needDraw=true; ui();
+  }catch(e){
+    stream=null;
+    say(e&&e.name==='NotAllowedError'?'Permiso de cámara denegado. Actívalo en el navegador o sube una foto.':'No se pudo abrir la cámara. Sube una foto.',true);
+    ui();
+  }
+}
+function stopCam(){
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  video.srcObject=null;
+  if(state.mode==='live'){state.mode=still?'still':'demo';needGrid=needDraw=true;}
+  ui();
+}
+function freeze(){
+  if(state.mode==='live'){
+    const c=document.createElement('canvas'); c.width=video.videoWidth; c.height=video.videoHeight;
+    const x=c.getContext('2d');
+    if(state.mirror&&state.facing==='user'){x.translate(c.width,0);x.scale(-1,1);}
+    x.drawImage(video,0,0); still=c; state.mode='still';
+  }else if(stream){state.mode='live';}
+  needGrid=needDraw=true; ui();
+}
+function loadFile(f){
+  if(!f) return;
+  const url=URL.createObjectURL(f), img=new Image();
+  img.onload=()=>{
+    const m=Math.min(1,2000/Math.max(img.naturalWidth,img.naturalHeight));
+    const c=document.createElement('canvas'); c.width=Math.round(img.naturalWidth*m); c.height=Math.round(img.naturalHeight*m);
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    URL.revokeObjectURL(url); still=c; state.mode='still'; needGrid=needDraw=true; ui();
+  };
+  img.onerror=()=>{URL.revokeObjectURL(url);say('No pude leer esa imagen. Prueba con otra.',true);};
+  img.src=url;
+}
+function makeBlob(){
+  const EW=1200, EH=Math.round(EW*out.height/out.width);
+  const c=document.createElement('canvas'); c.width=EW; c.height=EH;
+  renderTo(c.getContext('2d'),EW,EH);
+  return new Promise(res=>c.toBlob(res,'image/png'));
+}
+async function save(){
+  const b=await makeBlob(), url=URL.createObjectURL(b), a=document.createElement('a');
+  a.href=url; a.download='op-art-vasarely-'+state.filter+'.png';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+async function share(){
+  try{
+    const b=await makeBlob();
+    await navigator.share({files:[new File([b],'op-art-vasarely.png',{type:'image/png'})],title:'Op art Vasarely'});
+  }catch(e){}
+}
+
+/* ───────── interfaz ───────── */
+function chipRow(host,items,key,extra){
+  host.innerHTML='';
+  items.forEach(([id,label,html])=>{
+    const b=document.createElement('button'); b.type='button'; b.className='chip';
+    b.innerHTML=html||label; b.setAttribute('aria-pressed',state[key]===id);
+    b.addEventListener('click',()=>{
+      state[key]=id; [...host.children].forEach(x=>x.setAttribute('aria-pressed',x===b));
+      if(extra)extra(id); needDraw=true;
+    });
+    host.appendChild(b);
+  });
+}
+chipRow($('#filters'),Object.entries(FILTERS).map(([k,v])=>[k,v.label]),'filter',id=>{$('#fdesc').textContent=FILTERS[id].desc;});
+$('#fdesc').textContent=FILTERS[state.filter].desc;
+chipRow($('#palettes'),Object.entries(PALETTES).map(([k,v])=>{
+  const grad='linear-gradient(90deg,'+v.lines.map(c=>css(c)).join(',')+')';
+  return [k,v.name,'<span class="sw" style="background:'+grad+'"></span> '+v.name];
+}),'palette');
+chipRow($('#formats'),[['34','Vertical'],['sq','Cuadrado']],'format',id=>{
+  out.width=id==='sq'?640:540; out.height=id==='sq'?640:720; needGrid=true;
+});
+
+[['sInten','oInten','inten'],['sSize','oSize','size'],['sCont','oCont','contrast']].forEach(([s,o,k])=>{
+  const el=$('#'+s);
+  el.addEventListener('input',()=>{
+    state[k]=+el.value; $('#'+o).textContent=el.value; needDraw=true;
+    if(k==='contrast') needGrid=true;
+  });
+});
+$('#cInv').addEventListener('change',e=>{state.invert=e.target.checked;needGrid=needDraw=true;});
+$('#cMir').addEventListener('change',e=>{state.mirror=e.target.checked;needGrid=needDraw=true;});
+
+$('#btnCam').addEventListener('click',()=>stream?stopCam():startCam());
+$('#btnFlip').addEventListener('click',()=>{state.facing=state.facing==='user'?'environment':'user';startCam();});
+$('#btnFreeze').addEventListener('click',freeze);
+$('#btnSave').addEventListener('click',save);
+$('#file').addEventListener('change',e=>{loadFile(e.target.files[0]);e.target.value='';});
+try{
+  if(navigator.canShare&&navigator.canShare({files:[new File([''],'a.png',{type:'image/png'})]})){
+    $('#btnShare').hidden=false; $('#btnShare').addEventListener('click',share);
+  }
+}catch(e){}
+addEventListener('pagehide',()=>{if(stream)stream.getTracks().forEach(t=>t.stop());});
+
+/* exposición mínima para pruebas */
+window.__vasarely={state,FILTERS,PALETTES,redraw:()=>{needGrid=needDraw=true;}};
+
+ui();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
