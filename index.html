@@ -114,6 +114,7 @@ video{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none}
       <input id="file" type="file" accept="image/*">
       <button id="btnFlip" type="button" hidden>Voltear cámara</button>
       <button id="btnFreeze" type="button" hidden>Congelar foto</button>
+      <button id="btnRec" type="button">Grabar video</button>
       <button id="btnSave" type="button">Descargar PNG</button>
       <button id="btnShare" type="button" hidden>Compartir</button>
     </div>
@@ -172,6 +173,7 @@ const PALETTES={
 /* ───────── estado ───────── */
 const state={filter:'cebras',palette:'clasico',inten:60,size:45,contrast:50,invert:false,mirror:true,
              format:'34',mode:'demo',facing:'user'};
+const FORMATS={'34':{w:540,h:720,gw:240,gh:320,ex:1200},'sq':{w:640,h:640,gw:256,gh:256,ex:1200},'916':{w:540,h:960,gw:216,gh:384,ex:1080}};
 const out=$('#out'), octx=out.getContext('2d');
 const video=$('#vid');
 let stream=null, still=null, demo=null;
@@ -197,8 +199,8 @@ function boxBlur(src,w,h,r){
 function cropRect(sw,sh,a){let cw=sw,ch=sw/a;if(ch>sh){ch=sh;cw=sh*a;}return[(sw-cw)/2,(sh-ch)/2,cw,ch];}
 
 function buildGrid(src,sw,sh,mirror){
-  const sq=state.format==='sq', a=sq?1:3/4;
-  G.w=sq?256:240; G.h=sq?256:320;
+  const F=FORMATS[state.format], a=F.w/F.h;
+  G.w=F.gw; G.h=F.gh;
   if(gc.width!==G.w||gc.height!==G.h){gc.width=G.w;gc.height=G.h;}
   const [cx,cy,cw,ch]=cropRect(sw,sh,a);
   gctx.save();
@@ -360,7 +362,7 @@ function rCubos(ctx,W,H,P){
 }
 
 const FILTERS={
-  cebras:  {label:'Cebras',   fn:rCebras,   desc:'Rayas que se curvan con la luz y la sombra.'},
+  cebras:  {label:'Cebras',   fn:rCebras,   raster:true,   desc:'Rayas que se curvan con la luz y la sombra.'},
   esfera:  {label:'Esfera',   fn:rEsfera,   desc:'Una retícula de color que se hincha como una esfera.'},
   mosaico: {label:'Mosaico',  fn:rMosaico,  desc:'Rombos anidados que parecen vibrar.'},
   lineas:  {label:'Líneas',   fn:rLineas,   desc:'Líneas que ondulan y dibujan la imagen con su grosor.'},
@@ -386,10 +388,18 @@ function frame(t){
     if(video.readyState<2||!video.videoWidth||t-lastLive<33) return;
     lastLive=t; needGrid=true; needDraw=true;
   }
+  else if(rec.on){
+    if(t-lastLive<33) return;
+    lastLive=t; needDraw=true;
+  }
   if(!needDraw) return;
   if(needGrid){const [s,w,h,m]=getSource(); buildGrid(s,w,h,m); needGrid=false;}
   needDraw=false;
   renderTo(octx,out.width,out.height);
+  if(rec.on){
+    if(FILTERS[state.filter].raster) rec.cx.drawImage(out,0,0,rec.cv.width,rec.cv.height);
+    else renderTo(rec.cx,rec.cv.width,rec.cv.height);
+  }
 }
 
 /* ───────── imagen de ejemplo ───────── */
@@ -465,7 +475,7 @@ function loadFile(f){
   img.src=url;
 }
 function makeBlob(){
-  const EW=1200, EH=Math.round(EW*out.height/out.width);
+  const EW=FORMATS[state.format].ex, EH=Math.round(EW*out.height/out.width);
   const c=document.createElement('canvas'); c.width=EW; c.height=EH;
   renderTo(c.getContext('2d'),EW,EH);
   return new Promise(res=>c.toBlob(res,'image/png'));
@@ -482,6 +492,51 @@ async function share(){
     await navigator.share({files:[new File([b],'op-art-vasarely.png',{type:'image/png'})],title:'Op art Vasarely'});
   }catch(e){}
 }
+
+/* ───────── grabación de video ───────── */
+const rec={on:false,mr:null,chunks:[],t0:0,cv:null,cx:null,mime:'',ext:'',timer:null};
+function pickMime(){
+  if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream) return null;
+  const c=['video/mp4;codecs=avc1.42E01E','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  for(const m of c) if(MediaRecorder.isTypeSupported(m)) return m;
+  return '';
+}
+function tick(){
+  const s=Math.floor((performance.now()-rec.t0)/1000);
+  $('#btnRec').textContent='Detener · '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+  if(s>=60) stopRec();
+}
+function startRec(){
+  const mime=pickMime();
+  if(mime===null){say('Este navegador no permite grabar video.',true);return;}
+  const F=FORMATS[state.format], RW=720, RH=Math.round(720*F.h/F.w);
+  rec.cv=document.createElement('canvas'); rec.cv.width=RW; rec.cv.height=RH;
+  rec.cx=rec.cv.getContext('2d'); rec.cx.fillStyle='#000'; rec.cx.fillRect(0,0,RW,RH);
+  try{
+    rec.mr=new MediaRecorder(rec.cv.captureStream(30),mime?{mimeType:mime,videoBitsPerSecond:6e6}:{videoBitsPerSecond:6e6});
+  }catch(e){say('No se pudo iniciar la grabación.',true);return;}
+  rec.mime=rec.mr.mimeType||mime||'video/webm'; rec.ext=rec.mime.indexOf('mp4')>=0?'mp4':'webm';
+  rec.chunks=[]; rec.mr.ondataavailable=e=>{if(e.data&&e.data.size)rec.chunks.push(e.data);};
+  rec.mr.onstop=finishRec; rec.mr.start(500);
+  rec.on=true; rec.t0=performance.now(); needDraw=true;
+  rec.timer=setInterval(tick,250); tick(); say('Grabando… máximo 60 segundos');
+}
+function stopRec(){
+  if(!rec.on) return;
+  rec.on=false; clearInterval(rec.timer);
+  $('#btnRec').textContent='Grabar video';
+  try{rec.mr.stop();}catch(e){finishRec();}
+}
+function finishRec(){
+  const b=new Blob(rec.chunks,{type:rec.mime});
+  if(!b.size){say('La grabación salió vacía. Inténtalo de nuevo.',true);return;}
+  const url=URL.createObjectURL(b), a=document.createElement('a');
+  a.href=url; a.download='op-art-vasarely.'+rec.ext;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),8000);
+  say(rec.ext==='mp4'?'Video guardado (.mp4), listo para Instagram.':'Video guardado en .webm. Instagram puede pedir convertirlo a .mp4.');
+}
+$('#btnRec').addEventListener('click',()=>rec.on?stopRec():startRec());
+if(pickMime()===null) $('#btnRec').hidden=true;
 
 /* ───────── interfaz ───────── */
 function chipRow(host,items,key,extra){
@@ -502,8 +557,8 @@ chipRow($('#palettes'),Object.entries(PALETTES).map(([k,v])=>{
   const grad='linear-gradient(90deg,'+v.lines.map(c=>css(c)).join(',')+')';
   return [k,v.name,'<span class="sw" style="background:'+grad+'"></span> '+v.name];
 }),'palette');
-chipRow($('#formats'),[['34','Vertical'],['sq','Cuadrado']],'format',id=>{
-  out.width=id==='sq'?640:540; out.height=id==='sq'?640:720; needGrid=true;
+chipRow($('#formats'),[['34','Vertical 3:4'],['sq','Cuadrado'],['916','9:16 · Instagram']],'format',id=>{
+  out.width=FORMATS[id].w; out.height=FORMATS[id].h; needGrid=true; if(rec.on) stopRec();
 });
 
 [['sInten','oInten','inten'],['sSize','oSize','size'],['sCont','oCont','contrast']].forEach(([s,o,k])=>{
